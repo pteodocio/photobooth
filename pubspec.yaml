@@ -19,6 +19,7 @@ dependencies:
   share_plus: ^10.1.4
   gal: ^2.3.2
   cupertino_icons: ^1.0.8
+  qr: ^4.0.0
 
 dev_dependencies:
   flutter_test:
