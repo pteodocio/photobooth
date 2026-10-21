@@ -17,7 +17,7 @@ void main() {
 
   test('PosePromptEngine reset allows repeating initial prompt', () {
     final engine = PosePromptEngine();
-    final first = engine.nextPrompt();
+    engine.nextPrompt();
     engine.reset();
     expect(engine.lastPrompt, isNull);
   });

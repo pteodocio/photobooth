@@ -164,7 +164,7 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
 
     final now = DateTime.now();
     final dateStr = '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
-    final outPath = p.join(_sessionDir!.path, 'composite_${_sessionId}.png');
+    final outPath = p.join(_sessionDir!.path, 'composite_$_sessionId.png');
 
     final job = CompositeJob(
       photoPaths: selectedPaths,
