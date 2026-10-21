@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photobooth/core/models/frame_template.dart';
 import 'package:photobooth/core/models/layout_type.dart';
+import 'package:photobooth/core/models/photo_filter.dart';
+import 'package:photobooth/core/models/print_format.dart';
+import 'package:photobooth/core/models/session_state.dart';
 import 'package:photobooth/core/services/pose_prompt_engine.dart';
 import 'package:photobooth/features/contact_sheet/screens/contact_sheet_screen.dart';
 import 'package:photobooth/features/session/controllers/booth_session_controller.dart';
@@ -74,4 +77,131 @@ void main() {
     expect(find.byType(ReorderableListView), findsOneWidget);
     expect(find.textContaining('Strip Order'), findsOneWidget);
   });
+
+  testWidgets('ContactSheetScreen renders filter chips and tapping updates controller filter', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tempDir = Directory.systemTemp.createTempSync('filter_widget_');
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final controller = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+      for (int i = 1; i <= 6; i++) {
+        await controller.executeCaptureStep();
+      }
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: ContactSheetScreen(controller: controller),
+    ));
+
+    // Initial filter should be none (Original)
+    expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.none));
+
+    // Verify all filter chips are present
+    for (final filter in PhotoFilter.values) {
+      expect(find.byKey(ValueKey('filter_chip_${filter.name}')), findsOneWidget);
+      expect(find.text(filter.displayName), findsOneWidget);
+    }
+
+    // Tap Haru Blue chip
+    await tester.tap(find.byKey(const ValueKey('filter_chip_haruBlue')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.haruBlue));
+
+    // Verify ColorFiltered uses Haru Blue matrix
+    var colorFilteredWidgets = tester.widgetList<ColorFiltered>(find.byType(ColorFiltered));
+    expect(colorFilteredWidgets.any((w) => w.colorFilter == ColorFilter.matrix(PhotoFilter.haruBlue.matrix)), isTrue);
+
+    // Tap Warm Film chip
+    await tester.tap(find.byKey(const ValueKey('filter_chip_warmFilm')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.warmFilm));
+
+    // Tap Film Noir chip
+    await tester.tap(find.byKey(const ValueKey('filter_chip_mono')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.mono));
+
+    // Verify ColorFiltered uses Mono matrix
+    colorFilteredWidgets = tester.widgetList<ColorFiltered>(find.byType(ColorFiltered));
+    expect(colorFilteredWidgets.any((w) => w.colorFilter == ColorFilter.matrix(PhotoFilter.mono.matrix)), isTrue);
+
+    // Select a photo and verify strip tray also has ColorFiltered with selectedFilter
+    final inkWells = find.byType(InkWell);
+    await tester.tap(inkWells.first);
+    await tester.pump();
+    colorFilteredWidgets = tester.widgetList<ColorFiltered>(find.byType(ColorFiltered));
+    expect(colorFilteredWidgets.where((w) => w.colorFilter == ColorFilter.matrix(PhotoFilter.mono.matrix)).length, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('ContactSheetScreen renders print format buttons and tapping updates controller print format', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tempDir = Directory.systemTemp.createTempSync('format_widget_');
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final controller = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+      for (int i = 1; i <= 6; i++) {
+        await controller.executeCaptureStep();
+      }
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: ContactSheetScreen(controller: controller),
+    ));
+
+    // Initial print format should be singleStrip
+    expect((controller.state as SessionContactSheet).selectedPrintFormat, equals(PrintFormat.singleStrip));
+
+    // Verify format toggle buttons are present
+    expect(find.byKey(const ValueKey('format_single')), findsOneWidget);
+    expect(find.byKey(const ValueKey('format_twin')), findsOneWidget);
+    expect(find.text('Single Strip'), findsOneWidget);
+    expect(find.text('Twin Strip (1+1)'), findsOneWidget);
+
+    // Tap Twin Strip format
+    await tester.tap(find.byKey(const ValueKey('format_twin')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedPrintFormat, equals(PrintFormat.twinStrip));
+
+    // Tap Single Strip format back
+    await tester.tap(find.byKey(const ValueKey('format_single')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedPrintFormat, equals(PrintFormat.singleStrip));
+  });
 }
+

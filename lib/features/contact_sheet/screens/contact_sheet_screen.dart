@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../../core/models/photo_filter.dart';
+import '../../../core/models/print_format.dart';
 import '../../../core/models/session_state.dart';
 import '../../session/controllers/booth_session_controller.dart';
 import '../widgets/shot_thumbnail_tile.dart';
@@ -11,6 +13,35 @@ class ContactSheetScreen extends StatelessWidget {
     super.key,
     required this.controller,
   });
+
+  Widget _buildFormatOption({
+    required Key key,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      key: key,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFF5252) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,9 +148,12 @@ class ContactSheetScreen extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
-                                child: Image.file(
-                                  File(photo.filePath),
-                                  fit: BoxFit.cover,
+                                child: ColorFiltered(
+                                  colorFilter: ColorFilter.matrix(sheet.selectedFilter.matrix),
+                                  child: Image.file(
+                                    File(photo.filePath),
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
                               Positioned(
@@ -165,74 +199,146 @@ class ContactSheetScreen extends StatelessWidget {
                       final orderIndex = selectedIds.indexOf(photo.id);
                       final selectionOrder = orderIndex != -1 ? orderIndex + 1 : null;
 
-                      return ShotThumbnailTile(
-                        photo: photo,
-                        selectionOrder: selectionOrder,
-                        onTap: () => controller.selectShot(photo.id),
+                      return ColorFiltered(
+                        colorFilter: ColorFilter.matrix(sheet.selectedFilter.matrix),
+                        child: ShotThumbnailTile(
+                          photo: photo,
+                          selectionOrder: selectionOrder,
+                          onTap: () => controller.selectShot(photo.id),
+                        ),
                       );
                     },
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.grey[900]?.withAlpha(200),
                     border: const Border(top: BorderSide(color: Colors.white12)),
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.refresh, color: Colors.white70),
-                        label: const Text('Retake', style: TextStyle(color: Colors.white70)),
-                        onPressed: () async {
-                          final shouldRetake = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: Colors.grey[900],
-                              title: const Text('Retake burst?', style: TextStyle(color: Colors.white)),
-                              content: const Text(
-                                'This will discard current shots and restart the countdown.',
-                                style: TextStyle(color: Colors.white70),
+                      // Print format toggle
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black45,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildFormatOption(
+                                key: const ValueKey('format_single'),
+                                label: PrintFormat.singleStrip.displayName,
+                                isSelected: sheet.selectedPrintFormat == PrintFormat.singleStrip,
+                                onTap: () => controller.setPrintFormat(PrintFormat.singleStrip),
                               ),
-                              actions: [
-                                TextButton(
-                                  child: const Text('Cancel'),
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5252)),
-                                  child: const Text('Retake', style: TextStyle(color: Colors.white)),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (shouldRetake == true) {
-                            await controller.retakeBurst();
-                          }
-                        },
-                      ),
-                      const Spacer(),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF5252),
-                          disabledBackgroundColor: Colors.grey[800],
-                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: controller.canConfirmSelection
-                            ? () async {
-                                await controller.confirmSelection();
-                              }
-                            : null,
-                        child: const Text(
-                          'Bake Strip',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                              _buildFormatOption(
+                                key: const ValueKey('format_twin'),
+                                label: PrintFormat.twinStrip.displayName,
+                                isSelected: sheet.selectedPrintFormat == PrintFormat.twinStrip,
+                                onTap: () => controller.setPrintFormat(PrintFormat.twinStrip),
+                              ),
+                            ],
                           ),
                         ),
+                      ),
+
+                      // Filter selector row
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: PhotoFilter.values.map((filter) {
+                              final isSelected = sheet.selectedFilter == filter;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: ChoiceChip(
+                                  key: ValueKey('filter_chip_${filter.name}'),
+                                  label: Text(filter.displayName),
+                                  labelStyle: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  selected: isSelected,
+                                  selectedColor: const Color(0xFFFF5252),
+                                  backgroundColor: Colors.white10,
+                                  showCheckmark: false,
+                                  onSelected: (_) {
+                                    controller.setFilter(filter);
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+
+                      // Bottom actions: Retake & Bake Strip
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            icon: const Icon(Icons.refresh, color: Colors.white70),
+                            label: const Text('Retake', style: TextStyle(color: Colors.white70)),
+                            onPressed: () async {
+                              final shouldRetake = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: Colors.grey[900],
+                                  title: const Text('Retake burst?', style: TextStyle(color: Colors.white)),
+                                  content: const Text(
+                                    'This will discard current shots and restart the countdown.',
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      child: const Text('Cancel'),
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5252)),
+                                      child: const Text('Retake', style: TextStyle(color: Colors.white)),
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (shouldRetake == true) {
+                                await controller.retakeBurst();
+                              }
+                            },
+                          ),
+                          const Spacer(),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF5252),
+                              disabledBackgroundColor: Colors.grey[800],
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: controller.canConfirmSelection
+                                ? () async {
+                                    await controller.confirmSelection();
+                                  }
+                                : null,
+                            child: const Text(
+                              'Bake Strip',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
