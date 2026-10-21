@@ -1,5 +1,7 @@
 import 'frame_template.dart';
 import 'layout_type.dart';
+import 'photo_filter.dart';
+import 'print_format.dart';
 
 class CompositeJob {
   final List<String> photoPaths;
@@ -7,6 +9,10 @@ class CompositeJob {
   final LayoutType layout;
   final String dateString;
   final String outputPath;
+  final PhotoFilter filter;
+  final PrintFormat printFormat;
+  final String studioWatermark;
+  final String qrData;
 
   const CompositeJob({
     required this.photoPaths,
@@ -14,5 +20,9 @@ class CompositeJob {
     required this.layout,
     required this.dateString,
     required this.outputPath,
+    this.filter = PhotoFilter.none,
+    this.printFormat = PrintFormat.singleStrip,
+    this.studioWatermark = '인생네컷 • LIFE FOUR CUTS',
+    this.qrData = 'https://photobooth.app/strip',
   });
 }

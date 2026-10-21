@@ -4,6 +4,8 @@ import 'package:photobooth/core/models/frame_template.dart';
 import 'package:photobooth/core/models/captured_photo.dart';
 import 'package:photobooth/core/models/composite_job.dart';
 import 'package:photobooth/core/models/session_state.dart';
+import 'package:photobooth/core/models/photo_filter.dart';
+import 'package:photobooth/core/models/print_format.dart';
 
 void main() {
   test('LayoutType parameters match specification', () {
@@ -57,6 +59,10 @@ void main() {
     );
     expect(job.photoPaths.length, 1);
     expect(job.dateString, '2026.10.21');
+    expect(job.filter, PhotoFilter.none);
+    expect(job.printFormat, PrintFormat.singleStrip);
+    expect(job.studioWatermark, '인생네컷 • LIFE FOUR CUTS');
+    expect(job.qrData, 'https://photobooth.app/strip');
   });
 
   test('BoothSessionState instances instantiate properly', () {
@@ -75,5 +81,27 @@ void main() {
     expect(countingDown.currentShot, 1);
     expect(countingDown.secondsRemaining, 3);
     expect(countingDown.posePrompt, 'Finger heart 🫰');
+
+    final photo = CapturedPhoto(
+      id: 'p1',
+      filePath: '/tmp/p1.jpg',
+      timestamp: DateTime(2026, 10, 21),
+      shotIndex: 1,
+    );
+    final contactSheet = SessionContactSheet(
+      layout: LayoutType.fourCut,
+      frame: frame,
+      allShots: [photo],
+      selectedShotIds: ['p1'],
+    );
+    expect(contactSheet.selectedFilter, PhotoFilter.none);
+    expect(contactSheet.selectedPrintFormat, PrintFormat.singleStrip);
+
+    final updatedSheet = contactSheet.copyWith(
+      selectedFilter: PhotoFilter.haruBlue,
+      selectedPrintFormat: PrintFormat.twinStrip,
+    );
+    expect(updatedSheet.selectedFilter, PhotoFilter.haruBlue);
+    expect(updatedSheet.selectedPrintFormat, PrintFormat.twinStrip);
   });
 }
