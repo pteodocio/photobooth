@@ -6,6 +6,8 @@ import '../../../core/models/session_state.dart';
 import '../../session/controllers/booth_session_controller.dart';
 import '../widgets/shot_thumbnail_tile.dart';
 
+/// Screen allowing the user to select and reorder shots for their photobooth strip,
+/// choose an authentic Korean tone filter, and toggle single vs twin-strip print formats.
 class ContactSheetScreen extends StatelessWidget {
   final BoothSessionController controller;
 
@@ -14,6 +16,7 @@ class ContactSheetScreen extends StatelessWidget {
     required this.controller,
   });
 
+  /// Builds a toggle option button for selecting print format.
   Widget _buildFormatOption({
     required Key key,
     required String label,
@@ -26,7 +29,9 @@ class ContactSheetScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        constraints: const BoxConstraints(minHeight: 36),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFFF5252) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
@@ -77,6 +82,9 @@ class ContactSheetScreen extends StatelessWidget {
         final sheet = state as SessionContactSheet;
         final targetCount = sheet.layout.slotCount;
         final selectedIds = sheet.selectedShotIds;
+        final ColorFilter? activeFilter = sheet.selectedFilter != PhotoFilter.none
+            ? ColorFilter.matrix(sheet.selectedFilter.matrix)
+            : null;
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F0F11),
@@ -135,6 +143,17 @@ class ContactSheetScreen extends StatelessWidget {
                       itemBuilder: (context, idx) {
                         final photoId = selectedIds[idx];
                         final photo = sheet.allShots.firstWhere((p) => p.id == photoId);
+                        Widget trayImage = Image.file(
+                          File(photo.filePath),
+                          fit: BoxFit.cover,
+                        );
+                        if (activeFilter != null) {
+                          trayImage = ColorFiltered(
+                            colorFilter: activeFilter,
+                            child: trayImage,
+                          );
+                        }
+
                         return Container(
                           key: ValueKey(photoId),
                           width: 54,
@@ -148,13 +167,7 @@ class ContactSheetScreen extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
-                                child: ColorFiltered(
-                                  colorFilter: ColorFilter.matrix(sheet.selectedFilter.matrix),
-                                  child: Image.file(
-                                    File(photo.filePath),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
+                                child: trayImage,
                               ),
                               Positioned(
                                 bottom: 2,
@@ -199,13 +212,11 @@ class ContactSheetScreen extends StatelessWidget {
                       final orderIndex = selectedIds.indexOf(photo.id);
                       final selectionOrder = orderIndex != -1 ? orderIndex + 1 : null;
 
-                      return ColorFiltered(
-                        colorFilter: ColorFilter.matrix(sheet.selectedFilter.matrix),
-                        child: ShotThumbnailTile(
-                          photo: photo,
-                          selectionOrder: selectionOrder,
-                          onTap: () => controller.selectShot(photo.id),
-                        ),
+                      return ShotThumbnailTile(
+                        photo: photo,
+                        selectionOrder: selectionOrder,
+                        colorFilter: activeFilter,
+                        onTap: () => controller.selectShot(photo.id),
                       );
                     },
                   ),

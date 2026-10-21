@@ -5,18 +5,36 @@ import '../../../core/models/captured_photo.dart';
 class ShotThumbnailTile extends StatelessWidget {
   final CapturedPhoto photo;
   final int? selectionOrder; // 1-based index, or null if unselected
+  final ColorFilter? colorFilter;
   final VoidCallback onTap;
 
   const ShotThumbnailTile({
     super.key,
     required this.photo,
     required this.selectionOrder,
+    this.colorFilter,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final isSelected = selectionOrder != null;
+
+    Widget imageWidget = Image.file(
+      File(photo.filePath),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: Colors.grey[900],
+        child: const Icon(Icons.broken_image, color: Colors.white54),
+      ),
+    );
+
+    if (colorFilter != null) {
+      imageWidget = ColorFiltered(
+        colorFilter: colorFilter!,
+        child: imageWidget,
+      );
+    }
 
     return Material(
       color: Colors.transparent,
@@ -37,15 +55,8 @@ class ShotThumbnailTile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Photo image
-                Image.file(
-                  File(photo.filePath),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey[900],
-                    child: const Icon(Icons.broken_image, color: Colors.white54),
-                  ),
-                ),
+                // Photo image with filter applied strictly to pixels
+                imageWidget,
 
                 // Translucent dim when unselected
                 if (!isSelected)

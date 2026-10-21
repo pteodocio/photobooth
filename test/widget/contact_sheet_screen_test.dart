@@ -8,6 +8,7 @@ import 'package:photobooth/core/models/print_format.dart';
 import 'package:photobooth/core/models/session_state.dart';
 import 'package:photobooth/core/services/pose_prompt_engine.dart';
 import 'package:photobooth/features/contact_sheet/screens/contact_sheet_screen.dart';
+import 'package:photobooth/features/contact_sheet/widgets/shot_thumbnail_tile.dart';
 import 'package:photobooth/features/session/controllers/booth_session_controller.dart';
 import 'package:photobooth/services/compositor_service_impl.dart';
 import 'package:photobooth/services/feedback_service_impl.dart';
@@ -55,12 +56,12 @@ void main() {
     final bakeButtonFinder = find.widgetWithText(ElevatedButton, 'Bake Strip');
     expect(tester.widget<ElevatedButton>(bakeButtonFinder).enabled, isFalse);
 
-    // Select 4 photos
-    final inkWells = find.byType(InkWell);
-    expect(inkWells, findsWidgets);
+    // Select 4 photos using ShotThumbnailTile
+    final photoTiles = find.byType(ShotThumbnailTile);
+    expect(photoTiles, findsWidgets);
 
     for (int i = 0; i < 4; i++) {
-      await tester.tap(inkWells.at(i));
+      await tester.tap(photoTiles.at(i));
       await tester.pump();
     }
 
@@ -78,7 +79,7 @@ void main() {
     expect(find.textContaining('Strip Order'), findsOneWidget);
   });
 
-  testWidgets('ContactSheetScreen renders filter chips and tapping updates controller filter', (tester) async {
+  testWidgets('ContactSheetScreen renders filter chips and tapping updates controller filter with optimized shader passes', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -114,6 +115,9 @@ void main() {
     // Initial filter should be none (Original)
     expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.none));
 
+    // For PhotoFilter.none, ColorFiltered should be omitted to avoid shader fragment overhead
+    expect(find.byType(ColorFiltered), findsNothing);
+
     // Verify all filter chips are present
     for (final filter in PhotoFilter.values) {
       expect(find.byKey(ValueKey('filter_chip_${filter.name}')), findsOneWidget);
@@ -133,6 +137,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('filter_chip_warmFilm')));
     await tester.pump();
     expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.warmFilm));
+    colorFilteredWidgets = tester.widgetList<ColorFiltered>(find.byType(ColorFiltered));
+    expect(colorFilteredWidgets.any((w) => w.colorFilter == ColorFilter.matrix(PhotoFilter.warmFilm.matrix)), isTrue);
 
     // Tap Film Noir chip
     await tester.tap(find.byKey(const ValueKey('filter_chip_mono')));
@@ -144,11 +150,17 @@ void main() {
     expect(colorFilteredWidgets.any((w) => w.colorFilter == ColorFilter.matrix(PhotoFilter.mono.matrix)), isTrue);
 
     // Select a photo and verify strip tray also has ColorFiltered with selectedFilter
-    final inkWells = find.byType(InkWell);
-    await tester.tap(inkWells.first);
+    final photoTiles = find.byType(ShotThumbnailTile);
+    await tester.tap(photoTiles.first);
     await tester.pump();
     colorFilteredWidgets = tester.widgetList<ColorFiltered>(find.byType(ColorFiltered));
     expect(colorFilteredWidgets.where((w) => w.colorFilter == ColorFilter.matrix(PhotoFilter.mono.matrix)).length, greaterThanOrEqualTo(2));
+
+    // Return to Original (none) filter: ColorFiltered should be omitted again
+    await tester.tap(find.byKey(const ValueKey('filter_chip_none')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedFilter, equals(PhotoFilter.none));
+    expect(find.byType(ColorFiltered), findsNothing);
   });
 
   testWidgets('ContactSheetScreen renders print format buttons and tapping updates controller print format', (tester) async {
@@ -203,5 +215,80 @@ void main() {
     await tester.pump();
     expect((controller.state as SessionContactSheet).selectedPrintFormat, equals(PrintFormat.singleStrip));
   });
-}
 
+  testWidgets('ContactSheetScreen preserves selection invariance across filter and print format changes', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tempDir = Directory.systemTemp.createTempSync('invariance_widget_');
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final controller = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+      for (int i = 1; i <= 6; i++) {
+        await controller.executeCaptureStep();
+      }
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: ContactSheetScreen(controller: controller),
+    ));
+
+    // Select 4 photos
+    final photoTiles = find.byType(ShotThumbnailTile);
+    await tester.tap(photoTiles.at(0));
+    await tester.pump();
+    await tester.tap(photoTiles.at(1));
+    await tester.pump();
+    await tester.tap(photoTiles.at(2));
+    await tester.pump();
+    await tester.tap(photoTiles.at(3));
+    await tester.pump();
+
+    final originalSelection = List<String>.from((controller.state as SessionContactSheet).selectedShotIds);
+    expect(originalSelection.length, 4);
+
+    // 1. Switch print format to twinStrip
+    await tester.tap(find.byKey(const ValueKey('format_twin')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(originalSelection));
+
+    // 2. Switch filter to Haru Blue
+    await tester.tap(find.byKey(const ValueKey('filter_chip_haruBlue')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(originalSelection));
+
+    // 3. Switch filter to Film Noir
+    await tester.tap(find.byKey(const ValueKey('filter_chip_mono')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(originalSelection));
+
+    // 4. Switch print format back to singleStrip
+    await tester.tap(find.byKey(const ValueKey('format_single')));
+    await tester.pump();
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(originalSelection));
+
+    // Badges 1, 2, 3, 4 remain visible and Bake Strip remains enabled
+    expect(find.text('1'), findsWidgets);
+    expect(find.text('2'), findsWidgets);
+    expect(find.text('3'), findsWidgets);
+    expect(find.text('4'), findsWidgets);
+    final bakeButtonFinder = find.widgetWithText(ElevatedButton, 'Bake Strip');
+    expect(tester.widget<ElevatedButton>(bakeButtonFinder).enabled, isTrue);
+  });
+}

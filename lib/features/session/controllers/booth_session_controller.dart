@@ -173,6 +173,7 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
   void setFilter(PhotoFilter filter) {
     final s = value;
     if (s is SessionContactSheet) {
+      if (s.selectedFilter == filter) return;
       value = s.copyWith(selectedFilter: filter);
     }
   }
@@ -180,6 +181,7 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
   void setPrintFormat(PrintFormat format) {
     final s = value;
     if (s is SessionContactSheet) {
+      if (s.selectedPrintFormat == format) return;
       value = s.copyWith(selectedPrintFormat: format);
     }
   }
