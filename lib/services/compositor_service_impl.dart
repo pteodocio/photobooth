@@ -216,10 +216,12 @@ class CompositorServiceImpl implements CompositorService {
   ) {
     // Studio watermark centered around y = 3240
     if (job.studioWatermark.isNotEmpty) {
+      final wmX = (canvas.width - (job.studioWatermark.length * 14)) ~/ 2;
       img.drawString(
         canvas,
         job.studioWatermark,
         font: img.arial24,
+        x: wmX > 0 ? wmX : 10,
         y: 3240,
         color: captionColor,
       );

@@ -190,4 +190,36 @@ void main() {
     expect(decoded.width, 2400);
     expect(decoded.height, 3600);
   });
+
+  test('renderStrip renders centered studio watermark in bottom margin', () async {
+    final outputPath = "${testDir.path}/wm_strip.png";
+    final job = CompositeJob(
+      photoPaths: dummyPhotoPaths,
+      frame: FrameTemplate.bundledFrames.first,
+      layout: LayoutType.fourCut,
+      dateString: '2026.10.21',
+      outputPath: outputPath,
+      studioWatermark: 'LIFE FOUR CUTS - PHOTO STUDIO',
+    );
+
+    final resultPath = await compositor.renderStrip(job);
+    final decoded = img.decodePng(await File(resultPath).readAsBytes())!;
+
+    final capArgb = job.frame.captionColorValue;
+    final capR = (capArgb >> 16) & 0xFF;
+    final capG = (capArgb >> 8) & 0xFF;
+    final capB = capArgb & 0xFF;
+
+    // Scan across the centered watermark area around y = 3240
+    int wmPixels = 0;
+    for (int y = 3240; y < 3270; y++) {
+      for (int x = 200; x < 1000; x++) {
+        final p = decoded.getPixel(x, y);
+        if (p.r == capR && p.g == capG && p.b == capB) {
+          wmPixels++;
+        }
+      }
+    }
+    expect(wmPixels, greaterThan(50), reason: 'Centered studio watermark should be rendered in caption color');
+  });
 }

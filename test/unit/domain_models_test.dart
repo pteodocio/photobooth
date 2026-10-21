@@ -61,7 +61,7 @@ void main() {
     expect(job.dateString, '2026.10.21');
     expect(job.filter, PhotoFilter.none);
     expect(job.printFormat, PrintFormat.singleStrip);
-    expect(job.studioWatermark, '인생네컷 • LIFE FOUR CUTS');
+    expect(job.studioWatermark, 'LIFE FOUR CUTS - PHOTO STUDIO');
     expect(job.qrData, 'https://photobooth.app/strip');
   });
 

@@ -22,7 +22,7 @@ class CompositeJob {
     required this.outputPath,
     this.filter = PhotoFilter.none,
     this.printFormat = PrintFormat.singleStrip,
-    this.studioWatermark = '인생네컷 • LIFE FOUR CUTS',
+    this.studioWatermark = 'LIFE FOUR CUTS - PHOTO STUDIO',
     this.qrData = 'https://photobooth.app/strip',
   });
 }

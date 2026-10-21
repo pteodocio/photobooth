@@ -198,8 +198,8 @@ When `job.printFormat == PrintFormat.twinStrip`:
 ### 4.2 Export Screen (`ExportScreen`)
 * **Responsive Strip Preview**:
   * Automatically adjusts aspect ratio preview: 1:3 for Single Strip, 2:3 for Twin Strip.
-* **Instant Re-Bake / Format Toggle**:
-  * Switch between Single and Twin strip directly from the preview bar without leaving the screen.
+* **Format Badge & Immutable State**:
+  * Displays the active print format chip (Single Strip vs Twin Strip 1+1). Format selection is finalized on ContactSheetScreen prior to isolate baking to keep SessionExportReady immutable and eliminate redundant isolate render cycles.
 
 ---
 
