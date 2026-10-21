@@ -20,15 +20,22 @@ void main() {
     expect(LayoutType.single.aspectRatio, closeTo(3 / 4, 0.01));
   });
 
-  test('Bundled frame templates include at least 6 classic styles', () {
-    expect(FrameTemplate.bundledFrames.length, greaterThanOrEqualTo(6));
-    final ids = FrameTemplate.bundledFrames.map((f) => f.id).toSet();
-    expect(ids.contains('classic_black'), isTrue);
-    expect(ids.contains('vintage_white'), isTrue);
-    expect(ids.contains('retro_cream'), isTrue);
-    expect(ids.contains('pastel_pink'), isTrue);
-    expect(ids.contains('deep_navy'), isTrue);
-    expect(ids.contains('muted_olive'), isTrue);
+  test('Bundled frame templates include at least 16 styles with unique IDs', () {
+    expect(FrameTemplate.bundledFrames.length, greaterThanOrEqualTo(16));
+    final ids = FrameTemplate.bundledFrames.map((f) => f.id).toList();
+    final uniqueIds = ids.toSet();
+    expect(uniqueIds.length, equals(ids.length), reason: 'Every frame ID must be unique');
+
+    // Verify key classic and new aesthetic styles exist
+    expect(uniqueIds.contains('classic_black'), isTrue);
+    expect(uniqueIds.contains('vintage_white'), isTrue);
+    expect(uniqueIds.contains('haru_sky_blue'), isTrue);
+    expect(uniqueIds.contains('lavender_haze'), isTrue);
+    expect(uniqueIds.contains('butter_yellow'), isTrue);
+    expect(uniqueIds.contains('matcha_mint'), isTrue);
+    expect(uniqueIds.contains('peach_blossom'), isTrue);
+    expect(uniqueIds.contains('bubblegum_pop'), isTrue);
+    expect(uniqueIds.contains('midnight_violet'), isTrue);
   });
 
   test('CapturedPhoto and CompositeJob properties', () {
