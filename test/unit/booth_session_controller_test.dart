@@ -135,4 +135,38 @@ void main() {
     final countdown = controller.state as SessionCountingDown;
     expect(countdown.currentShot, 1);
   });
+
+  test('cancelSession during in-flight capture step does not resurrect session', () async {
+    final delayedCamera = DelayedMockCameraService(delay: const Duration(milliseconds: 80));
+    final raceController = BoothSessionController(
+      cameraService: delayedCamera,
+      storageService: storage,
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+    await raceController.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+
+    // Start capture asynchronously
+    final captureFuture = raceController.executeCaptureStep();
+    // Cancel session immediately while takePicture is in-flight
+    await raceController.cancelSession();
+    expect(raceController.state, isA<SessionInitial>());
+
+    await captureFuture;
+    // Must remain in SessionInitial, NOT resurrected to SessionCountingDown
+    expect(raceController.state, isA<SessionInitial>());
+  });
 }
+
+class DelayedMockCameraService extends MockCameraService {
+  final Duration delay;
+  DelayedMockCameraService({required this.delay});
+
+  @override
+  Future<String> takePicture(String destinationDirectory) async {
+    await Future.delayed(delay);
+    return await super.takePicture(destinationDirectory);
+  }
+}
+

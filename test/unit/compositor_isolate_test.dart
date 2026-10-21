@@ -51,4 +51,27 @@ void main() {
     expect(decoded!.width, 1200);
     expect(decoded.height, 3600);
   });
+
+  test('renderStrip handles large high-res photos without memory exhaustion', () async {
+    final largePhotoPaths = <String>[];
+    for (int i = 0; i < 4; i++) {
+      final largeImage = img.Image(width: 3200, height: 2400);
+      img.fill(largeImage, color: img.ColorRgb8(100, 150, 200));
+      final file = File('${testDir.path}/large_$i.png');
+      await file.writeAsBytes(img.encodePng(largeImage));
+      largePhotoPaths.add(file.path);
+    }
+
+    final outputPath = '${testDir.path}/large_output_strip.png';
+    final job = CompositeJob(
+      photoPaths: largePhotoPaths,
+      frame: FrameTemplate.bundledFrames.first,
+      layout: LayoutType.fourCut,
+      dateString: '2026.10.21',
+      outputPath: outputPath,
+    );
+
+    final resultPath = await compositor.renderStrip(job);
+    expect(File(resultPath).existsSync(), isTrue);
+  });
 }

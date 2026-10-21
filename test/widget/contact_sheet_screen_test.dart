@@ -65,9 +65,13 @@ void main() {
     expect(tester.widget<ElevatedButton>(bakeButtonFinder).enabled, isTrue);
 
     // Badges 1, 2, 3, 4 are visible
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget);
-    expect(find.text('4'), findsOneWidget);
+    expect(find.text('1'), findsWidgets);
+    expect(find.text('2'), findsWidgets);
+    expect(find.text('3'), findsWidgets);
+    expect(find.text('4'), findsWidgets);
+
+    // Reorderable strip tray is displayed
+    expect(find.byType(ReorderableListView), findsOneWidget);
+    expect(find.textContaining('Strip Order'), findsOneWidget);
   });
 }

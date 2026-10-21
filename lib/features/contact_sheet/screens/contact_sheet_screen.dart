@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/models/session_state.dart';
 import '../../session/controllers/booth_session_controller.dart';
@@ -63,16 +64,92 @@ class ContactSheetScreen extends StatelessWidget {
           ),
           body: SafeArea(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Text(
-                    'Tap to select ${sheet.selectedShotIds.length}/$targetCount. Photos will appear on the strip in selected order.',
+                    'Tap to select ${sheet.selectedShotIds.length}/$targetCount. Drag strip items to reorder.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white54, fontSize: 13),
                   ),
                 ),
-                const SizedBox(height: 12),
+
+                // Reorderable Strip Tray
+                if (selectedIds.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.drag_indicator, size: 16, color: Colors.white54),
+                        SizedBox(width: 4),
+                        Text(
+                          'Strip Order (drag to rearrange):',
+                          style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    height: 72,
+                    child: ReorderableListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      itemCount: selectedIds.length,
+                      // ignore: deprecated_member_use
+                      onReorder: (oldIndex, newIndex) {
+                        controller.reorderSelectedShots(oldIndex, newIndex);
+                      },
+                      itemBuilder: (context, idx) {
+                        final photoId = selectedIds[idx];
+                        final photo = sheet.allShots.firstWhere((p) => p.id == photoId);
+                        return Container(
+                          key: ValueKey(photoId),
+                          width: 54,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFF5252), width: 1.5),
+                          ),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.file(
+                                  File(photo.filePath),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 2,
+                                left: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black87,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '${idx + 1}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 8),
                 Expanded(
                   child: GridView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

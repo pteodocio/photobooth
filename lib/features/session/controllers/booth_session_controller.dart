@@ -88,33 +88,53 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
     // Multi-sensory feedback trigger
     await feedbackService.shutterCue();
 
-    // Camera take picture
-    final filePath = await cameraService.takePicture(_sessionDir!.path);
-    final photo = CapturedPhoto(
-      id: 'shot_$shotIndex',
-      filePath: filePath,
-      timestamp: DateTime.now(),
-      shotIndex: shotIndex,
-    );
-    _capturedPhotos.add(photo);
+    // Guard against cancellation before taking picture
+    if (_sessionId == null || _sessionDir == null || value is! SessionCapturing) return;
 
-    if (shotIndex < layout.burstCount) {
-      final nextPose = poseEngine.nextPrompt();
-      value = SessionCountingDown(
-        layout: layout,
-        frame: frame,
-        currentShot: shotIndex + 1,
-        secondsRemaining: AppConstants.defaultCountdownSeconds,
-        posePrompt: nextPose,
+    try {
+      final filePath = await cameraService.takePicture(_sessionDir!.path);
+
+      // Guard against cancellation after taking picture
+      if (_sessionId == null || _sessionDir == null || value is! SessionCapturing) {
+        final file = File(filePath);
+        if (file.existsSync()) {
+          try {
+            file.deleteSync();
+          } catch (_) {}
+        }
+        return;
+      }
+
+      final photo = CapturedPhoto(
+        id: 'shot_$shotIndex',
+        filePath: filePath,
+        timestamp: DateTime.now(),
+        shotIndex: shotIndex,
       );
-    } else {
-      // Completed all burst shots -> Contact sheet
-      value = SessionContactSheet(
-        layout: layout,
-        frame: frame,
-        allShots: List.unmodifiable(_capturedPhotos),
-        selectedShotIds: const [],
-      );
+      _capturedPhotos.add(photo);
+
+      if (shotIndex < layout.burstCount) {
+        final nextPose = poseEngine.nextPrompt();
+        value = SessionCountingDown(
+          layout: layout,
+          frame: frame,
+          currentShot: shotIndex + 1,
+          secondsRemaining: AppConstants.defaultCountdownSeconds,
+          posePrompt: nextPose,
+        );
+      } else {
+        // Completed all burst shots -> Contact sheet
+        value = SessionContactSheet(
+          layout: layout,
+          frame: frame,
+          allShots: List.unmodifiable(_capturedPhotos),
+          selectedShotIds: const [],
+        );
+      }
+    } catch (_) {
+      // If session was cancelled during takePicture, safely ignore file write errors
+      if (_sessionId == null || _sessionDir == null) return;
+      rethrow;
     }
   }
 

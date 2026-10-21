@@ -41,9 +41,9 @@ class CompositorServiceImpl implements CompositorService {
         final photoFile = File(photoPaths[i]);
         if (!photoFile.existsSync()) continue;
 
-        final bytes = photoFile.readAsBytesSync();
-        final rawPhoto = img.decodeImage(bytes);
+        var rawPhoto = img.decodeImage(photoFile.readAsBytesSync());
         if (rawPhoto == null) continue;
+        rawPhoto = img.bakeOrientation(rawPhoto);
 
         final slotY = marginTop + i * (slotH + gutter);
         _drawCroppedPhoto(strip, rawPhoto, marginX, slotY, slotW, slotH);
@@ -62,8 +62,9 @@ class CompositorServiceImpl implements CompositorService {
         final photoFile = File(photoPaths[i]);
         if (!photoFile.existsSync()) continue;
 
-        final rawPhoto = img.decodeImage(photoFile.readAsBytesSync());
+        var rawPhoto = img.decodeImage(photoFile.readAsBytesSync());
         if (rawPhoto == null) continue;
+        rawPhoto = img.bakeOrientation(rawPhoto);
 
         final col = i % cols;
         final row = i ~/ cols;
@@ -80,8 +81,9 @@ class CompositorServiceImpl implements CompositorService {
       const slotY = 120;
 
       if (photoPaths.isNotEmpty && File(photoPaths.first).existsSync()) {
-        final rawPhoto = img.decodeImage(File(photoPaths.first).readAsBytesSync());
+        var rawPhoto = img.decodeImage(File(photoPaths.first).readAsBytesSync());
         if (rawPhoto != null) {
+          rawPhoto = img.bakeOrientation(rawPhoto);
           _drawCroppedPhoto(strip, rawPhoto, slotX, slotY, slotW, slotH);
         }
       }
@@ -124,24 +126,40 @@ class CompositorServiceImpl implements CompositorService {
     int targetW,
     int targetH,
   ) {
+    img.Image working = source;
+
+    // Memory optimization: if source photo is significantly larger than target slot,
+    // pre-downscale to 2x target size to prevent massive heap consumption during crop.
+    final maxAllowedW = targetW * 2;
+    final maxAllowedH = targetH * 2;
+    if (working.width > maxAllowedW && working.height > maxAllowedH) {
+      final srcAspect = working.width / working.height;
+      final targetAspect = targetW / targetH;
+      if (srcAspect > targetAspect) {
+        working = img.copyResize(working, height: maxAllowedH, interpolation: img.Interpolation.linear);
+      } else {
+        working = img.copyResize(working, width: maxAllowedW, interpolation: img.Interpolation.linear);
+      }
+    }
+
     final targetAspect = targetW / targetH;
-    final srcAspect = source.width / source.height;
+    final srcAspect = working.width / working.height;
 
     int cropX = 0;
     int cropY = 0;
-    int cropW = source.width;
-    int cropH = source.height;
+    int cropW = working.width;
+    int cropH = working.height;
 
     if (srcAspect > targetAspect) {
-      cropW = (source.height * targetAspect).round();
-      cropX = ((source.width - cropW) / 2).round();
+      cropW = (working.height * targetAspect).round();
+      cropX = ((working.width - cropW) / 2).round();
     } else {
-      cropH = (source.width / targetAspect).round();
-      cropY = ((source.height - cropH) / 2).round();
+      cropH = (working.width / targetAspect).round();
+      cropY = ((working.height - cropH) / 2).round();
     }
 
     final cropped = img.copyCrop(
-      source,
+      working,
       x: cropX,
       y: cropY,
       width: cropW,
