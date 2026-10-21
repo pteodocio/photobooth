@@ -7,6 +7,8 @@ import '../../../core/models/captured_photo.dart';
 import '../../../core/models/composite_job.dart';
 import '../../../core/models/frame_template.dart';
 import '../../../core/models/layout_type.dart';
+import '../../../core/models/photo_filter.dart';
+import '../../../core/models/print_format.dart';
 import '../../../core/models/session_state.dart';
 import '../../../core/services/camera_service.dart';
 import '../../../core/services/compositor_service.dart';
@@ -168,6 +170,20 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
     value = s.copyWith(selectedShotIds: list);
   }
 
+  void setFilter(PhotoFilter filter) {
+    final s = value;
+    if (s is SessionContactSheet) {
+      value = s.copyWith(selectedFilter: filter);
+    }
+  }
+
+  void setPrintFormat(PrintFormat format) {
+    final s = value;
+    if (s is SessionContactSheet) {
+      value = s.copyWith(selectedPrintFormat: format);
+    }
+  }
+
   Future<void> confirmSelection() async {
     final s = value;
     if (s is! SessionContactSheet || !canConfirmSelection) return;
@@ -192,6 +208,9 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
       layout: layout,
       dateString: dateStr,
       outputPath: outPath,
+      filter: s.selectedFilter,
+      printFormat: s.selectedPrintFormat,
+      qrData: 'https://photobooth.app/strip?s=$_sessionId',
     );
 
     final finalPath = await compositorService.renderStrip(job);

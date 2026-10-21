@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:photobooth/core/models/composite_job.dart';
 import 'package:photobooth/core/models/frame_template.dart';
 import 'package:photobooth/core/models/layout_type.dart';
+import 'package:photobooth/core/models/photo_filter.dart';
+import 'package:photobooth/core/models/print_format.dart';
 import 'package:photobooth/core/models/session_state.dart';
 import 'package:photobooth/core/services/pose_prompt_engine.dart';
 import 'package:photobooth/features/session/controllers/booth_session_controller.dart';
@@ -10,21 +13,33 @@ import 'package:photobooth/services/feedback_service_impl.dart';
 import 'package:photobooth/services/mock_camera_service.dart';
 import 'package:photobooth/services/storage_service_impl.dart';
 
+class TrackingCompositorService extends CompositorServiceImpl {
+  CompositeJob? lastJob;
+
+  @override
+  Future<String> renderStrip(CompositeJob job) async {
+    lastJob = job;
+    return super.renderStrip(job);
+  }
+}
+
 void main() {
   late Directory tempDir;
   late BoothSessionController controller;
   late MockCameraService mockCamera;
   late StorageServiceImpl storage;
+  late TrackingCompositorService compositor;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('controller_test_');
     mockCamera = MockCameraService();
     storage = StorageServiceImpl(baseDirectoryOverride: tempDir);
+    compositor = TrackingCompositorService();
     controller = BoothSessionController(
       cameraService: mockCamera,
       storageService: storage,
       feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
-      compositorService: CompositorServiceImpl(),
+      compositorService: compositor,
       poseEngine: PosePromptEngine(),
     );
   });
@@ -109,6 +124,31 @@ void main() {
     expect(controller.state, isA<SessionExportReady>());
     final exportReady = controller.state as SessionExportReady;
     expect(File(exportReady.compositeFilePath).existsSync(), isTrue);
+  });
+
+  test('setFilter and setPrintFormat update state and pass to CompositeJob on confirmSelection', () async {
+    await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    for (int i = 1; i <= 6; i++) {
+      await controller.executeCaptureStep();
+    }
+    expect(controller.state, isA<SessionContactSheet>());
+    final sheet = controller.state as SessionContactSheet;
+    for (int i = 0; i < 4; i++) {
+      controller.selectShot(sheet.allShots[i].id);
+    }
+
+    controller.setFilter(PhotoFilter.haruBlue);
+    expect((controller.state as SessionContactSheet).selectedFilter, PhotoFilter.haruBlue);
+
+    controller.setPrintFormat(PrintFormat.twinStrip);
+    expect((controller.state as SessionContactSheet).selectedPrintFormat, PrintFormat.twinStrip);
+
+    await controller.confirmSelection();
+
+    expect(compositor.lastJob, isNotNull);
+    expect(compositor.lastJob!.filter, PhotoFilter.haruBlue);
+    expect(compositor.lastJob!.printFormat, PrintFormat.twinStrip);
+    expect(compositor.lastJob!.qrData, contains('https://photobooth.app/strip?s='));
   });
 
   test('cancelSession purges directory and returns to SessionInitial', () async {
