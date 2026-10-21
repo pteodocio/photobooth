@@ -45,33 +45,57 @@ class ExportScreen extends StatelessWidget {
           body: SafeArea(
             child: Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: Chip(
+                    label: Text(
+                      state.printFormat.displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    backgroundColor: Colors.white.withAlpha(25),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Colors.white24),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
                 Expanded(
                   child: Center(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black87,
-                            blurRadius: 16,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: compositeFile.existsSync()
-                            ? Image.file(
-                                compositeFile,
-                                fit: BoxFit.contain,
-                              )
-                            : Container(
-                                color: Colors.grey[900],
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
-                                ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      child: AspectRatio(
+                        aspectRatio: state.printFormat.aspectRatio,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black87,
+                                blurRadius: 16,
+                                offset: Offset(0, 8),
                               ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: compositeFile.existsSync()
+                                ? Image.file(
+                                    compositeFile,
+                                    fit: BoxFit.contain,
+                                  )
+                                : Container(
+                                    color: Colors.grey[900],
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                                    ),
+                                  ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -220,6 +220,7 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
       layout: layout,
       frame: frame,
       compositeFilePath: finalPath,
+      printFormat: s.selectedPrintFormat,
     );
   }
 

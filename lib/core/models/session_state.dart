@@ -98,10 +98,12 @@ class SessionExportReady extends BoothSessionState {
   final LayoutType layout;
   final FrameTemplate frame;
   final String compositeFilePath;
+  final PrintFormat printFormat;
 
   const SessionExportReady({
     required this.layout,
     required this.frame,
     required this.compositeFilePath,
+    this.printFormat = PrintFormat.singleStrip,
   });
 }
