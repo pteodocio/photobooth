@@ -4,7 +4,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/models/session_state.dart';
 import '../../session/controllers/booth_session_controller.dart';
 
-class ExportScreen extends StatelessWidget {
+/// Screen displayed after film strip compositing completes.
+/// Renders a dynamic aspect ratio preview, format badge, and export actions
+/// (save to gallery, share, and return to home session).
+class ExportScreen extends StatefulWidget {
   final BoothSessionController controller;
 
   const ExportScreen({
@@ -13,9 +16,16 @@ class ExportScreen extends StatelessWidget {
   });
 
   @override
+  State<ExportScreen> createState() => _ExportScreenState();
+}
+
+class _ExportScreenState extends State<ExportScreen> {
+  bool _isSaving = false;
+
+  @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<BoothSessionState>(
-      valueListenable: controller,
+      valueListenable: widget.controller,
       builder: (context, state, child) {
         if (state is! SessionExportReady) {
           return const Scaffold(
@@ -119,21 +129,36 @@ class ExportScreen extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              icon: const Icon(Icons.download),
-                              label: const Text('Save to Roll'),
-                              onPressed: () async {
-                                final success = await controller.storageService.saveToGallery(compositePath);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        success ? 'Saved strip to Camera Roll!' : 'Unable to save to gallery',
-                                      ),
-                                      backgroundColor: success ? Colors.green[800] : Colors.red[800],
-                                    ),
-                                  );
-                                }
-                              },
+                              icon: _isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.download),
+                              label: Text(_isSaving ? 'Saving...' : 'Save to Roll'),
+                              onPressed: _isSaving
+                                  ? null
+                                  : () async {
+                                      setState(() => _isSaving = true);
+                                      try {
+                                        final success = await widget.controller.storageService.saveToGallery(compositePath);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                success ? 'Saved strip to Camera Roll!' : 'Unable to save to gallery',
+                                              ),
+                                              backgroundColor: success ? Colors.green[800] : Colors.red[800],
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _isSaving = false);
+                                        }
+                                      }
+                                    },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -148,10 +173,21 @@ class ExportScreen extends StatelessWidget {
                               icon: const Icon(Icons.share),
                               label: const Text('Share'),
                               onPressed: () async {
-                                await Share.shareXFiles(
-                                  [XFile(compositePath)],
-                                  text: 'My Korean 4-Cut Photobooth Strip #인생네컷',
-                                );
+                                try {
+                                  await Share.shareXFiles(
+                                    [XFile(compositePath)],
+                                    text: 'My Korean 4-Cut Photobooth Strip #인생네컷',
+                                  );
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to share: $e'),
+                                        backgroundColor: Colors.red[800],
+                                      ),
+                                    );
+                                  }
+                                }
                               },
                             ),
                           ),
@@ -162,7 +198,7 @@ class ExportScreen extends StatelessWidget {
                         width: double.infinity,
                         child: TextButton(
                           onPressed: () async {
-                            await controller.finishSession();
+                            await widget.controller.finishSession();
                           },
                           child: const Text(
                             'Done & New Session',

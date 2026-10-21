@@ -15,7 +15,7 @@ import 'package:photobooth/services/storage_service_impl.dart';
 
 void main() {
   testWidgets('ExportScreen renders singleStrip with aspect ratio 1/3, chip, action buttons and finishes session', (tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('export_widget_single_');
+    final tempDir = Directory.systemTemp.createTempSync('export_widget_');
     addTearDown(() {
       try {
         if (tempDir.existsSync()) {
@@ -52,15 +52,14 @@ void main() {
 
     expect(find.text('Your Film Strip'), findsOneWidget);
     expect(find.text('Single Strip'), findsOneWidget);
+    expect(find.text('Save to Roll'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
+    expect(find.text('Done & New Session'), findsOneWidget);
 
     final aspectRatioFinder = find.byType(AspectRatio);
     expect(aspectRatioFinder, findsOneWidget);
     final aspectRatio = tester.widget<AspectRatio>(aspectRatioFinder);
     expect(aspectRatio.aspectRatio, closeTo(1 / 3, 0.001));
-
-    expect(find.text('Save to Roll'), findsOneWidget);
-    expect(find.text('Share'), findsOneWidget);
-    expect(find.text('Done & New Session'), findsOneWidget);
 
     // Tap Done inside runAsync to allow async finalizeSession to execute
     await tester.runAsync(() async {
@@ -116,5 +115,14 @@ void main() {
     expect(aspectRatioFinder, findsOneWidget);
     final aspectRatio = tester.widget<AspectRatio>(aspectRatioFinder);
     expect(aspectRatio.aspectRatio, closeTo(2 / 3, 0.001));
+
+    // Finish session cleanly
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Done & New Session'));
+      await Future.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+
+    expect(controller.state, isA<SessionInitial>());
   });
 }
