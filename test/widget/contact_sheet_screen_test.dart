@@ -291,4 +291,117 @@ void main() {
     final bakeButtonFinder = find.widgetWithText(ElevatedButton, 'Bake Strip');
     expect(tester.widget<ElevatedButton>(bakeButtonFinder).enabled, isTrue);
   });
+
+  testWidgets('ContactSheetScreen Retake button opens confirmation dialog and can retake or cancel', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tempDir = Directory.systemTemp.createTempSync('retake_widget_');
+    addTearDown(() {
+      try {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      } catch (_) {}
+    });
+
+    final controller = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+      for (int i = 1; i <= 6; i++) {
+        await controller.executeCaptureStep();
+      }
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: ContactSheetScreen(controller: controller),
+    ));
+
+    expect(find.byKey(const ValueKey('retake_button')), findsOneWidget);
+
+    // 1. Tap Retake -> Dialog appears
+    await tester.tap(find.byKey(const ValueKey('retake_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Retake burst?'), findsOneWidget);
+
+    // Tap Cancel in dialog
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Dialog closed, still on contact sheet
+    expect(find.text('Retake burst?'), findsNothing);
+    expect(controller.state, isA<SessionContactSheet>());
+
+    // 2. Tap Retake again -> Confirm
+    await tester.tap(find.byKey(const ValueKey('retake_button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('dialog_confirm_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Controller transitioned to SessionCountingDown for new burst
+    expect(controller.state, isA<SessionCountingDown>());
+  });
+
+  testWidgets('ContactSheetScreen PopScope exit dialog cancels session on Exit', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tempDir = Directory.systemTemp.createTempSync('pop_sheet_widget_');
+    addTearDown(() {
+      try {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      } catch (_) {}
+    });
+
+    final controller = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+      for (int i = 1; i <= 6; i++) {
+        await controller.executeCaptureStep();
+      }
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: ContactSheetScreen(controller: controller),
+    ));
+
+    // Trigger back via PopScope
+    final dynamic popScope = tester.widget(find.byWidgetPredicate((w) => w is PopScope));
+    popScope.onPopInvokedWithResult(false, null);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Exit session?'), findsOneWidget);
+
+    // Tap Exit
+    await tester.tap(find.byKey(const ValueKey('exit_dialog_confirm_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(controller.state, isA<SessionInitial>());
+  });
 }

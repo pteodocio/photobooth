@@ -37,6 +37,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     _secondsLeft = 3;
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (_secondsLeft > 1) {
+        if (!mounted) return;
         setState(() {
           _secondsLeft--;
         });
@@ -44,6 +45,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       } else {
         timer.cancel();
         await widget.controller.feedbackService.countdownFinalBeep();
+        if (!mounted) return;
         await widget.controller.executeCaptureStep();
         if (mounted && widget.controller.state is SessionCountingDown) {
           _startAutoCountdown();
@@ -84,61 +86,72 @@ class _CaptureScreenState extends State<CaptureScreen> {
         };
         final isFlashing = state is SessionCapturing;
 
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Camera Preview
-              Center(
-                child: widget.controller.cameraService.buildPreview(),
-              ),
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            _countdownTimer?.cancel();
+            await widget.controller.cancelSession();
+          },
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Camera Preview
+                Center(
+                  child: widget.controller.cameraService.buildPreview(),
+                ),
 
-              // 2. Flash Overlay
-              FlashOverlay(isFlashing: isFlashing),
+                // 2. Flash Overlay
+                FlashOverlay(isFlashing: isFlashing),
 
-              // 3. UI Controls and Overlay
-              SafeArea(
-                child: Column(
-                  children: [
-                    // Top App Bar Controls
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                            onPressed: () async {
-                              _countdownTimer?.cancel();
-                              await widget.controller.cancelSession();
-                            },
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(20),
+                // 3. UI Controls and Overlay
+                SafeArea(
+                  child: Column(
+                    children: [
+                      // Top App Bar Controls
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              key: const ValueKey('cancel_capture_button'),
+                              icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                              onPressed: () async {
+                                _countdownTimer?.cancel();
+                                await widget.controller.cancelSession();
+                              },
                             ),
-                            child: Text(
-                              'Shot $currentShot of $totalShots',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'Shot $currentShot of $totalShots',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 26),
-                            onPressed: () async {
-                              await widget.controller.cameraService.switchCamera();
-                              setState(() {});
-                            },
-                          ),
-                        ],
+                            IconButton(
+                              key: const ValueKey('flip_camera_button'),
+                              icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 26),
+                              onPressed: () async {
+                                try {
+                                  await widget.controller.cameraService.switchCamera();
+                                } catch (_) {}
+                                if (mounted) setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
                     const SizedBox(height: 12),
                     // Pose Prompt Banner
@@ -155,8 +168,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ),
             ],
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 }

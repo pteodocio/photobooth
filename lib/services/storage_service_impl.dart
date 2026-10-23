@@ -19,8 +19,8 @@ class StorageServiceImpl implements StorageService {
   Future<Directory> _getSessionsRoot() async {
     final base = await _getBaseDirectory();
     final sessionsDir = Directory(p.join(base.path, 'sessions'));
-    if (!await sessionsDir.exists()) {
-      await sessionsDir.create(recursive: true);
+    if (!sessionsDir.existsSync()) {
+      sessionsDir.createSync(recursive: true);
     }
     return sessionsDir;
   }
@@ -29,8 +29,8 @@ class StorageServiceImpl implements StorageService {
   Future<Directory> createSessionDirectory(String sessionId) async {
     final sessionsRoot = await _getSessionsRoot();
     final sessionDir = Directory(p.join(sessionsRoot.path, sessionId));
-    if (!await sessionDir.exists()) {
-      await sessionDir.create(recursive: true);
+    if (!sessionDir.existsSync()) {
+      sessionDir.createSync(recursive: true);
     }
     return sessionDir;
   }
@@ -39,15 +39,17 @@ class StorageServiceImpl implements StorageService {
   Future<void> clearSession(String sessionId) async {
     final sessionsRoot = await _getSessionsRoot();
     final sessionDir = Directory(p.join(sessionsRoot.path, sessionId));
-    if (await sessionDir.exists()) {
-      await sessionDir.delete(recursive: true);
+    if (sessionDir.existsSync()) {
+      try {
+        sessionDir.deleteSync(recursive: true);
+      } catch (_) {}
     }
   }
 
   @override
   Future<void> cleanupOrphanedSessions({String? activeSessionId}) async {
     final sessionsRoot = await _getSessionsRoot();
-    if (!await sessionsRoot.exists()) return;
+    if (!sessionsRoot.existsSync()) return;
 
     final entities = sessionsRoot.listSync();
     for (final entity in entities) {
@@ -55,7 +57,7 @@ class StorageServiceImpl implements StorageService {
         final dirName = p.basename(entity.path);
         if (activeSessionId == null || dirName != activeSessionId) {
           try {
-            await entity.delete(recursive: true);
+            entity.deleteSync(recursive: true);
           } catch (_) {
             // Ignore file-in-use errors during background cleanup
           }

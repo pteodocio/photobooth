@@ -161,9 +161,12 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
     if (s is! SessionContactSheet) return;
 
     final list = List<String>.from(s.selectedShotIds);
+    if (oldIndex < 0 || oldIndex >= list.length) return;
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
+    if (newIndex < 0 || newIndex >= list.length) return;
+
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
 
@@ -215,13 +218,19 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
       qrData: 'https://photobooth.app/strip?s=$_sessionId',
     );
 
-    final finalPath = await compositorService.renderStrip(job);
-    value = SessionExportReady(
-      layout: layout,
-      frame: frame,
-      compositeFilePath: finalPath,
-      printFormat: s.selectedPrintFormat,
-    );
+    try {
+      final finalPath = await compositorService.renderStrip(job);
+      value = SessionExportReady(
+        layout: layout,
+        frame: frame,
+        compositeFilePath: finalPath,
+        printFormat: s.selectedPrintFormat,
+      );
+    } catch (_) {
+      // Revert to Contact Sheet so user is never stuck in infinite loading
+      value = s;
+      rethrow;
+    }
   }
 
   Future<void> retakeBurst() async {
@@ -250,12 +259,14 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
 
   Future<void> cancelSession() async {
     _countdownTimer?.cancel();
-    if (_sessionId != null) {
-      await storageService.clearSession(_sessionId!);
-    }
-    _capturedPhotos.clear();
-    _sessionDir = null;
+    final sid = _sessionId;
     _sessionId = null;
+    _sessionDir = null;
+    _capturedPhotos.clear();
+
+    if (sid != null) {
+      await storageService.clearSession(sid);
+    }
 
     final currentLayout = switch (value) {
       SessionInitial s => s.layout,
@@ -271,12 +282,14 @@ class BoothSessionController extends ValueNotifier<BoothSessionState> {
 
   Future<void> finishSession() async {
     _countdownTimer?.cancel();
-    if (_sessionId != null) {
-      await storageService.finalizeSession(_sessionId!);
-    }
-    _capturedPhotos.clear();
-    _sessionDir = null;
+    final sid = _sessionId;
     _sessionId = null;
+    _sessionDir = null;
+    _capturedPhotos.clear();
+
+    if (sid != null) {
+      await storageService.finalizeSession(sid);
+    }
 
     final currentLayout = switch (value) {
       SessionInitial s => s.layout,

@@ -37,21 +37,27 @@ class _ExportScreenState extends State<ExportScreen> {
         final compositePath = state.compositeFilePath;
         final compositeFile = File(compositePath);
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF0F0F11),
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            centerTitle: true,
-            title: const Text(
-              'Your Film Strip',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            await widget.controller.finishSession();
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFF0F0F11),
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              title: const Text(
+                'Your Film Strip',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
             ),
-          ),
           body: SafeArea(
             child: Column(
               children: [
@@ -123,6 +129,7 @@ class _ExportScreenState extends State<ExportScreen> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
+                              key: const ValueKey('save_to_roll_button'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white,
                                 side: const BorderSide(color: Colors.white38),
@@ -140,6 +147,17 @@ class _ExportScreenState extends State<ExportScreen> {
                               onPressed: _isSaving
                                   ? null
                                   : () async {
+                                      if (!compositeFile.existsSync()) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: const Text('Strip file not found on disk'),
+                                              backgroundColor: Colors.red[800],
+                                            ),
+                                          );
+                                        }
+                                        return;
+                                      }
                                       setState(() => _isSaving = true);
                                       try {
                                         final success = await widget.controller.storageService.saveToGallery(compositePath);
@@ -164,6 +182,7 @@ class _ExportScreenState extends State<ExportScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton.icon(
+                              key: const ValueKey('share_button'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFF5252),
                                 foregroundColor: Colors.white,
@@ -174,9 +193,11 @@ class _ExportScreenState extends State<ExportScreen> {
                               label: const Text('Share'),
                               onPressed: () async {
                                 try {
+                                  final box = context.findRenderObject() as RenderBox?;
                                   await Share.shareXFiles(
                                     [XFile(compositePath)],
                                     text: 'My Korean 4-Cut Photobooth Strip #인생네컷',
+                                    sharePositionOrigin: box != null ? box.localToGlobal(Offset.zero) & box.size : null,
                                   );
                                 } catch (e) {
                                   if (context.mounted) {
@@ -197,6 +218,7 @@ class _ExportScreenState extends State<ExportScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: TextButton(
+                          key: const ValueKey('done_button'),
                           onPressed: () async {
                             await widget.controller.finishSession();
                           },
@@ -212,7 +234,8 @@ class _ExportScreenState extends State<ExportScreen> {
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }

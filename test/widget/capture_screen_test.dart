@@ -46,7 +46,88 @@ void main() {
     expect(find.text(promptState.posePrompt), findsOneWidget);
 
     await tester.runAsync(() async {
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(find.byKey(const ValueKey('cancel_capture_button')));
+      await Future.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+
+    expect(controller.state, isA<SessionInitial>());
+  });
+
+  testWidgets('CaptureScreen flip camera button switches lens direction', (tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('capture_flip_test_');
+    addTearDown(() {
+      try {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      } catch (_) {}
+    });
+
+    final mockCamera = MockCameraService();
+    final controller = BoothSessionController(
+      cameraService: mockCamera,
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: CaptureScreen(controller: controller),
+    ));
+
+    expect(find.byKey(const ValueKey('flip_camera_button')), findsOneWidget);
+    expect(find.textContaining('Mock Camera Preview (back)'), findsOneWidget);
+
+    // Tap flip camera
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const ValueKey('flip_camera_button')));
+      await Future.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+
+    expect(find.textContaining('Mock Camera Preview (front)'), findsOneWidget);
+  });
+
+  testWidgets('CaptureScreen PopScope cancels session on system back', (tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('capture_pop_test_');
+    addTearDown(() {
+      try {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      } catch (_) {}
+    });
+
+    final controller = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: StorageServiceImpl(baseDirectoryOverride: tempDir),
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: CompositorServiceImpl(),
+      poseEngine: PosePromptEngine(),
+    );
+
+    await tester.runAsync(() async {
+      await controller.cameraService.initialize();
+      await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      home: CaptureScreen(controller: controller),
+    ));
+
+    expect(controller.state, isA<SessionCountingDown>());
+
+    // Trigger back via PopScope
+    final dynamic popScope = tester.widget(find.byWidgetPredicate((w) => w is PopScope));
+    await tester.runAsync(() async {
+      popScope.onPopInvokedWithResult(false, null);
       await Future.delayed(const Duration(milliseconds: 50));
     });
     await tester.pump();

@@ -43,30 +43,42 @@ class CameraServiceImpl implements CameraService {
   }
 
   Future<void> _startController(CameraDescription cameraDescription) async {
+    _initialized = false;
     final prevController = _controller;
     if (prevController != null) {
-      await prevController.dispose();
+      try {
+        await prevController.dispose();
+      } catch (_) {}
     }
 
-    final newController = CameraController(
-      cameraDescription,
-      ResolutionPreset.high,
-      enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.jpeg,
-    );
+    try {
+      final newController = CameraController(
+        cameraDescription,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
 
-    _controller = newController;
-    await newController.initialize();
-    await newController.lockCaptureOrientation(DeviceOrientation.portraitUp);
-    _initialized = true;
+      _controller = newController;
+      await newController.initialize();
+      await newController.lockCaptureOrientation(DeviceOrientation.portraitUp);
+      _initialized = true;
+    } catch (_) {
+      _initialized = false;
+    }
   }
 
   @override
   Future<void> switchCamera() async {
     if (_cameras.length <= 1) return;
 
+    final prevIndex = _selectedCameraIndex;
     _selectedCameraIndex = (_selectedCameraIndex + 1) % _cameras.length;
-    await _startController(_cameras[_selectedCameraIndex]);
+    try {
+      await _startController(_cameras[_selectedCameraIndex]);
+    } catch (_) {
+      _selectedCameraIndex = prevIndex;
+    }
   }
 
   @override

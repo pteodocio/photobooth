@@ -86,9 +86,41 @@ class ContactSheetScreen extends StatelessWidget {
             ? ColorFilter.matrix(sheet.selectedFilter.matrix)
             : null;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF0F0F11),
-          appBar: AppBar(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final shouldCancel = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: Colors.grey[900],
+                title: const Text('Exit session?', style: TextStyle(color: Colors.white)),
+                content: const Text(
+                  'Your photos will be discarded and you will return to frame selection.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                actions: [
+                  TextButton(
+                    key: const ValueKey('exit_dialog_cancel_button'),
+                    child: const Text('Stay'),
+                    onPressed: () => Navigator.pop(ctx, false),
+                  ),
+                  ElevatedButton(
+                    key: const ValueKey('exit_dialog_confirm_button'),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5252)),
+                    child: const Text('Exit', style: TextStyle(color: Colors.white)),
+                    onPressed: () => Navigator.pop(ctx, true),
+                  ),
+                ],
+              ),
+            );
+            if (shouldCancel == true) {
+              await controller.cancelSession();
+            }
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFF0F0F11),
+            appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
             centerTitle: true,
@@ -142,10 +174,14 @@ class ContactSheetScreen extends StatelessWidget {
                       },
                       itemBuilder: (context, idx) {
                         final photoId = selectedIds[idx];
-                        final photo = sheet.allShots.firstWhere((p) => p.id == photoId);
+                        final photo = sheet.allShots.where((p) => p.id == photoId).firstOrNull ?? sheet.allShots.first;
                         Widget trayImage = Image.file(
                           File(photo.filePath),
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: Colors.grey[900],
+                            child: const Icon(Icons.broken_image, color: Colors.white54, size: 16),
+                          ),
                         );
                         if (activeFilter != null) {
                           trayImage = ColorFiltered(
@@ -297,6 +333,7 @@ class ContactSheetScreen extends StatelessWidget {
                       Row(
                         children: [
                           TextButton.icon(
+                            key: const ValueKey('retake_button'),
                             icon: const Icon(Icons.refresh, color: Colors.white70),
                             label: const Text('Retake', style: TextStyle(color: Colors.white70)),
                             onPressed: () async {
@@ -311,10 +348,12 @@ class ContactSheetScreen extends StatelessWidget {
                                   ),
                                   actions: [
                                     TextButton(
+                                      key: const ValueKey('dialog_cancel_button'),
                                       child: const Text('Cancel'),
                                       onPressed: () => Navigator.pop(ctx, false),
                                     ),
                                     ElevatedButton(
+                                      key: const ValueKey('dialog_confirm_button'),
                                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5252)),
                                       child: const Text('Retake', style: TextStyle(color: Colors.white)),
                                       onPressed: () => Navigator.pop(ctx, true),
@@ -329,6 +368,7 @@ class ContactSheetScreen extends StatelessWidget {
                           ),
                           const Spacer(),
                           ElevatedButton(
+                            key: const ValueKey('bake_strip_button'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFFF5252),
                               disabledBackgroundColor: Colors.grey[800],
@@ -357,7 +397,8 @@ class ContactSheetScreen extends StatelessWidget {
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }

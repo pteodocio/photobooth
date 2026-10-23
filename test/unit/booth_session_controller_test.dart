@@ -6,6 +6,7 @@ import 'package:photobooth/core/models/layout_type.dart';
 import 'package:photobooth/core/models/photo_filter.dart';
 import 'package:photobooth/core/models/print_format.dart';
 import 'package:photobooth/core/models/session_state.dart';
+import 'package:photobooth/core/services/compositor_service.dart';
 import 'package:photobooth/core/services/pose_prompt_engine.dart';
 import 'package:photobooth/features/session/controllers/booth_session_controller.dart';
 import 'package:photobooth/services/compositor_service_impl.dart';
@@ -197,6 +198,90 @@ void main() {
     // Must remain in SessionInitial, NOT resurrected to SessionCountingDown
     expect(raceController.state, isA<SessionInitial>());
   });
+
+  test('reorderSelectedShots ignores invalid or out-of-bounds indices without crashing', () async {
+    await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    for (int i = 1; i <= 6; i++) {
+      await controller.executeCaptureStep();
+    }
+    final sheet = controller.state as SessionContactSheet;
+    for (int i = 0; i < 4; i++) {
+      controller.selectShot(sheet.allShots[i].id);
+    }
+
+    final initialOrder = List<String>.from((controller.state as SessionContactSheet).selectedShotIds);
+    expect(initialOrder.length, 4);
+
+    // Out of bounds calls should safely no-op
+    controller.reorderSelectedShots(-1, 2);
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(initialOrder));
+
+    controller.reorderSelectedShots(10, 2);
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(initialOrder));
+
+    controller.reorderSelectedShots(1, -5);
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(initialOrder));
+
+    controller.reorderSelectedShots(1, 100);
+    expect((controller.state as SessionContactSheet).selectedShotIds, equals(initialOrder));
+
+    // Valid call reorders correctly
+    controller.reorderSelectedShots(0, 2);
+    final reordered = (controller.state as SessionContactSheet).selectedShotIds;
+    expect(reordered[1], initialOrder[0]);
+  });
+
+  test('confirmSelection rolls back to SessionContactSheet if compositing fails', () async {
+    final failingCompositor = FailingMockCompositor();
+    final failController = BoothSessionController(
+      cameraService: MockCameraService(),
+      storageService: storage,
+      feedbackService: FeedbackServiceImpl(enableAudio: false, enableHaptics: false),
+      compositorService: failingCompositor,
+      poseEngine: PosePromptEngine(),
+    );
+
+    await failController.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    for (int i = 1; i <= 6; i++) {
+      await failController.executeCaptureStep();
+    }
+    final sheet = failController.state as SessionContactSheet;
+    for (int i = 0; i < 4; i++) {
+      failController.selectShot(sheet.allShots[i].id);
+    }
+
+    // confirmSelection should throw and rollback state
+    expect(failController.confirmSelection(), throwsA(isA<Exception>()));
+    await pumpEventQueue();
+
+    // Must be rolled back to SessionContactSheet so user isn't stuck
+    expect(failController.state, isA<SessionContactSheet>());
+  });
+
+  test('concurrent or repeated cancelSession and finishSession calls execute safely', () async {
+    await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    // Double cancel
+    await Future.wait([
+      controller.cancelSession(),
+      controller.cancelSession(),
+    ]);
+    expect(controller.state, isA<SessionInitial>());
+
+    await controller.startSession(LayoutType.fourCut, FrameTemplate.bundledFrames.first);
+    // Double finish
+    await Future.wait([
+      controller.finishSession(),
+      controller.finishSession(),
+    ]);
+    expect(controller.state, isA<SessionInitial>());
+  });
+}
+
+class FailingMockCompositor implements CompositorService {
+  @override
+  Future<String> renderStrip(CompositeJob job) async {
+    throw Exception('Simulated isolate rendering failure');
+  }
 }
 
 class DelayedMockCameraService extends MockCameraService {
